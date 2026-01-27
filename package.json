@@ -1,0 +1,42 @@
+{
+  "name": "@deepgram/live-text-to-speech-html",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pure HTML/CSS/JS frontend for Deepgram Live Text-to-Speech",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "deepgram",
+    "text-to-speech",
+    "live-text-to-speech",
+    "html",
+    "javascript",
+    "css",
+    "audio"
+  ],
+  "author": "Deepgram",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deepgram-starters/live-text-to-speech-html.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browserslist": [
+    "defaults",
+    "not ie 11",
+    "not op_mini all"
+  ],
+  "dependencies": {
+    "@deepgram/styles": "latest"
+  },
+  "devDependencies": {
+    "vite": "^7.2.2"
+  }
+}

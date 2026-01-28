@@ -1,487 +1,463 @@
 <!DOCTYPE html>
 <html lang="en">
-  <!--
-  ============================================================================
-  LIVE TEXT-TO-SPEECH HTML STARTER - FRONTEND UI
-  ============================================================================
 
-  This is a complete live TTS interface built with:
-  - Pure HTML/CSS/JavaScript (no frameworks)
-  - Deepgram Design System for styling
-  - WebSocket for real-time audio generation
-  - Responsive layout with mobile-first design
-  - Queue-based generation with latency tracking
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Live Text-to-Speech demo using Deepgram" id="pageDescription">
+  <title id="pageTitle">Live Text-to-Speech</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+    integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="./node_modules/@deepgram/styles/dist/deepgram.css" />
+  <script type="module" src="/main.js"></script>
 
-  CUSTOMIZATION GUIDE:
-  1. Modify voice models in main.js (populated by user)
-  2. Change colors by overriding CSS variables in <style> section
-  3. Customize layout by modifying the structure below
-  4. Add features by extending main.js functions
+  <style>
+    /* Layout & Background */
+    body {
+      background: var(--dg-charcoal, #1a1a1f);
+      margin: 0;
+      padding: 0;
+    }
 
-  ARCHITECTURE:
-  - Text input + model selection → WebSocket → Deepgram
-  - Audio chunks collected per-text → played when flushed
-  - Queue displays all generations with latency metrics
--->
+    /* Column Styling */
+    .dg-column--sidebar-left {
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--dg-almost-black, #050506);
+      overflow-y: auto;
+      height: 100%;
+    }
 
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Live text-to-speech demo using Deepgram"
-    />
-    <title>Deepgram Live Text-to-Speech</title>
+    .dg-column--main {
+      background: var(--dg-background, #0b0b0c);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
 
-    <!-- ======================================================================
-       EXTERNAL DEPENDENCIES
-       ====================================================================== -->
+    .dg-column--sidebar-right {
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--dg-almost-black, #050506);
+      overflow-y: auto;
+      height: 100%;
+    }
 
-    <!-- Font Awesome - Icons used throughout the UI -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
-      integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    />
-
-    <!-- Deepgram Design System Styles - Core styling framework -->
-    <link
-      rel="stylesheet"
-      href="./node_modules/@deepgram/styles/dist/deepgram.css"
-    />
-
-    <!-- Application JavaScript - Main application logic -->
-    <script type="module" src="/main.js"></script>
-
-    <!-- ======================================================================
-       CUSTOM STYLES - Using Deepgram design system
-       ====================================================================== -->
-
-    <style>
-      /* ===================================================================
-       LAYOUT & BACKGROUND
-       =================================================================== */
-
-      body {
-        background: var(--dg-charcoal, #1a1a1f);
-        min-height: 100vh;
+    @media (min-width: 768px) {
+      .dg-column--sidebar-right {
+        border-top: none;
       }
+    }
 
-      .main-container {
-        max-width: 80rem;
-        margin: 0 auto;
-        padding: 2rem 1rem;
+    @media (min-width: 1024px) {
+      .dg-column--sidebar-left {
+        border-bottom: none;
       }
+    }
 
-      @media (max-width: 768px) {
-        .main-container {
-          padding: 1rem;
-        }
+    /* Configuration Section */
+    .config-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .config-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .dg-form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Transcript Container */
+    .transcript-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .transcript-item {
+      background: var(--dg-almost-black, #050506);
+      border-left: 3px solid var(--dg-primary, #13ef95);
+      padding: 1rem;
+      border-radius: 0.25rem;
+    }
+
+    .transcript-item__timestamp {
+      font-size: 0.7rem;
+      color: var(--dg-muted, #949498);
+      margin-bottom: 0.5rem;
+    }
+
+    .transcript-item__text {
+      color: var(--dg-text, #fbfbff);
+      line-height: 1.5;
+    }
+
+    /* Empty State */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--dg-muted, #949498);
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .empty-state__icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    .empty-state__text {
+      font-size: 1rem;
+    }
+
+    /* Playback Controls */
+    .playback-controls {
+      padding: 1.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--dg-almost-black, #050506);
+    }
+
+    .playback-info {
+      text-align: center;
+    }
+
+    .playback-info__label {
+      font-size: 0.7rem;
+      color: var(--dg-muted, #949498);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .playback-info__value {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--dg-text, #fbfbff);
+    }
+
+    /* Status Grid */
+    .status-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .status-item__label {
+      font-size: 0.7rem;
+      color: var(--dg-muted, #949498);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-item__value {
+      font-size: 0.875rem;
+      color: var(--dg-text, #fbfbff);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .status-badge--connected {
+      color: var(--dg-primary, #13ef95);
+    }
+
+    .status-badge--disconnected {
+      color: var(--dg-muted, #949498);
+    }
+
+    .status-badge--error {
+      color: var(--dg-error, #ff4444);
+    }
+
+    .status-indicator {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .status-indicator--connected {
+      background: var(--dg-primary, #13ef95);
+    }
+
+    .status-indicator--disconnected {
+      background: var(--dg-muted, #949498);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
       }
-
-      /* ===================================================================
-       FORM LAYOUT - Side-by-side text input and model selection
-       =================================================================== */
-
-      .input-row {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
+      50% {
+        opacity: 0.5;
       }
+    }
 
-      @media (min-width: 768px) {
-        .input-row {
-          grid-template-columns: 2fr 1fr;
-        }
-      }
+    /* Connect Overlay */
+    .connect-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(11, 11, 12, 0.95);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
 
-      .input-column {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
+    .connect-overlay.hidden {
+      display: none;
+    }
 
-      /* ===================================================================
-       QUEUE/HISTORY ITEM STYLING - Adapted from text-intelligence
-       =================================================================== */
+    .connect-prompt {
+      text-align: center;
+      padding: 2rem;
+    }
 
-      .queue-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
+    .connect-prompt__icon {
+      font-size: 3rem;
+      color: var(--dg-primary, #13ef95);
+      margin-bottom: 1rem;
+    }
 
-      .queue-item {
-        display: block;
-        padding: 1rem;
-        border-radius: 0.375rem;
-        border: 1px solid var(--dg-pebble, #4e4e52);
-        background: var(--dg-background, #0b0b0c);
-        transition: all 0.2s;
-      }
+    .connect-prompt__title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--dg-text, #fbfbff);
+      margin-bottom: 0.5rem;
+    }
 
-      .queue-item--generating {
-        border-color: var(--dg-primary, #13ef95);
-        box-shadow: 0 0 0 1px var(--dg-primary, #13ef95);
-      }
+    .connect-prompt__subtitle {
+      color: var(--dg-muted, #949498);
+      margin-bottom: 2rem;
+    }
 
-      .queue-item--complete {
-        border-color: var(--dg-primary, #13ef95);
-      }
+    /* Disconnect Button Container */
+    .disconnect-container {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      z-index: 5;
+    }
 
-      .queue-item--error {
-        border-color: var(--dg-danger, #ff3b3b);
-      }
+    /* Main Content Container */
+    .main-content-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
 
-      .queue-item__header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        gap: 1rem;
-        margin-bottom: 0.75rem;
-      }
+    /* Utilities */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
 
-      .queue-item__text {
-        flex: 1;
-        color: var(--dg-text, #fbfbff);
-        font-size: 0.9rem;
-        line-height: 1.5;
-        word-break: break-word;
-      }
-
-      .queue-item__remove {
-        background: none;
-        border: none;
-        color: var(--dg-muted, #949498);
-        cursor: pointer;
-        padding: 0.25rem;
-        font-size: 1rem;
-        transition: color 0.2s;
-      }
-
-      .queue-item__remove:hover {
-        color: var(--dg-danger, #ff3b3b);
-      }
-
-      .queue-item__meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        font-size: 0.75rem;
-        margin-bottom: 0.75rem;
-      }
-
-      .queue-item__model {
-        color: var(--dg-primary, #13ef95);
-        font-family: monospace;
-      }
-
-      .queue-item__status {
-        color: var(--dg-muted, #949498);
-      }
-
-      .queue-item__status--generating {
-        color: var(--dg-primary, #13ef95);
-      }
-
-      .queue-item__status--complete {
-        color: var(--dg-primary, #13ef95);
-      }
-
-      .queue-item__status--error {
-        color: var(--dg-danger, #ff3b3b);
-      }
-
-      .queue-item__latency {
-        color: var(--dg-accent, #8a3ffc);
-        font-weight: 600;
-      }
-
-      .queue-item__actions {
-        display: flex;
-        gap: 0.5rem;
-      }
-
-      /* ===================================================================
-       EMPTY STATE
-       =================================================================== */
-
-      .empty-state {
-        text-align: center;
-        padding: 3rem 1rem;
-        color: var(--dg-muted, #949498);
-      }
-
-      .empty-state-icon {
-        font-size: 3rem;
-        opacity: 0.3;
-        margin-bottom: 1rem;
-      }
-
-      .empty-state-text {
-        font-size: 0.875rem;
-        line-height: 1.6;
-      }
-
-      /* ===================================================================
-       UTILITIES
-       =================================================================== */
-
-      .hidden {
-        display: none !important;
-      }
-
-      .spinning {
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes spin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      /* Form input styling */
-      .dg-input {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        background: var(--dg-background, #0b0b0c);
-        border: 2px solid var(--dg-pebble, #4e4e52);
-        border-radius: 0.5rem;
-        color: var(--dg-fog, #edede2);
-        font-family: inherit;
-        font-size: 0.875rem;
-        transition: border-color 0.2s;
-      }
-
-      .dg-input:focus {
-        outline: none;
-        border-color: var(--dg-primary, #13ef95);
-      }
-
-      .dg-input::placeholder {
-        color: var(--dg-muted, #949498);
-      }
-
-      .dg-select {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        background: var(--dg-background, #0b0b0c);
-        border: 2px solid var(--dg-pebble, #4e4e52);
-        border-radius: 0.5rem;
-        color: var(--dg-fog, #edede2);
-        font-family: inherit;
-        font-size: 0.875rem;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-
-  <body>
-    <!-- ======================================================================
-       HEADER - Top navigation bar
-       ====================================================================== -->
-
-    <header
-      class="dg-section dg-section--compact"
-      style="border-bottom: 1px solid rgba(255, 255, 255, 0.1)"
-    >
-      <div class="dg-constrain-width">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          "
-        >
-          <div>
-            <h1 class="dg-section-heading" style="margin-bottom: 0">
-              <i class="fa-solid fa-microphone-lines dg-text-primary"></i>
-              Deepgram Live TTS
-            </h1>
-          </div>
-          <div>
-            <a
-              href="https://developers.deepgram.com/docs/streaming-text-to-speech"
-              class="dg-btn dg-btn--ghost dg-btn--sm"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <i class="fa-solid fa-book"></i> Docs
-            </a>
-          </div>
-        </div>
+<body>
+  <!-- Header -->
+  <header class="dg-header">
+    <div class="dg-header__container">
+      <div class="dg-header__logo">
+        <span class="dg-header__logo-text" id="headerTitle">Live Text-to-Speech</span>
       </div>
-    </header>
+      <nav class="dg-header__nav">
+        <a href="https://github.com/deepgram-starters/node-live-text-to-speech" id="repoLink" class="dg-btn dg-btn--ghost dg-btn--sm" target="_blank"
+          rel="noopener noreferrer">
+          <i class="fa-brands fa-github"></i> GitHub
+        </a>
+        <a href="https://console.deepgram.com" class="dg-btn dg-btn--secondary dg-btn--sm" target="_blank"
+          rel="noopener noreferrer">Free API Key</a>
+      </nav>
+    </div>
+  </header>
 
-    <!-- ======================================================================
-       MAIN CONTENT
-       ====================================================================== -->
+  <!-- Main Layout -->
+  <div class="dg-columns" style="width: 100%; max-width: 100%; height: calc(100vh - 65px); overflow: hidden;">
+    <div class="dg-columns__wrapper" style="height: 100%;">
 
-    <main class="main-container">
-      <!-- ====================================================================
-         CONFIGURATION SECTION
-         ==================================================================== -->
+      <!-- Left Sidebar: Configuration -->
+      <aside class="dg-column dg-column--sidebar-left dg-column--lg">
+        <div class="dg-content-box">
+          <h3 class="dg-form-label" style="margin-bottom: 1rem;">Configuration</h3>
 
-      <section
-        class="dg-section dg-section--bordered"
-        style="margin-bottom: 2rem"
-      >
-        <h2 class="dg-section-heading">Text Input</h2>
-
-        <!-- Text Input (left) and Model Selection (right) -->
-        <div class="input-row">
-          <!-- Left column: Text input -->
-          <div class="input-column">
-            <label for="textInput" class="dg-form-label">
-              <i class="fa-solid fa-file-text"></i> Text to Convert
+          <!-- Model Selection -->
+          <div class="config-section">
+            <label class="dg-form-label" for="model-select">
+              <i class="fa-solid fa-microphone"></i> Voice Model
             </label>
-            <textarea
-              id="textInput"
-              class="dg-input"
-              rows="8"
-              placeholder="Enter the text you want to convert to speech..."
-              style="resize: vertical; min-height: 250px"
-            ></textarea>
+            <select id="model-select" class="dg-input">
+              <option value="aura-asteria-en">Aura Asteria</option>
+              <option value="aura-luna-en">Aura Luna</option>
+              <option value="aura-stella-en">Aura Stella</option>
+              <option value="aura-athena-en">Aura Athena</option>
+              <option value="aura-hera-en">Aura Hera</option>
+              <option value="aura-orion-en">Aura Orion</option>
+              <option value="aura-arcas-en">Aura Arcas</option>
+              <option value="aura-perseus-en">Aura Perseus</option>
+              <option value="aura-angus-en">Aura Angus</option>
+              <option value="aura-orpheus-en">Aura Orpheus</option>
+              <option value="aura-helios-en">Aura Helios</option>
+              <option value="aura-zeus-en">Aura Zeus</option>
+            </select>
           </div>
 
-          <!-- Right column: Model selection + Generate button -->
-          <div class="input-column">
-            <label for="modelSelect" class="dg-form-label"> Voice Model </label>
-            <select id="modelSelect" class="dg-select">
-              <option value="aura-2-thalia-en">
-                Thalia (Female American English)
-              </option>
-              <option value="aura-2-theia-en">
-                Theia (Female Australian English)
-              </option>
-              <option value="aura-2-pandora-en">
-                Helena (Female British English)
-              </option>
-              <option value="aura-2-celeste-es">
-                Celeste (Female Colombian Spanish)
-              </option>
-              <option value="aura-2-mars-en">
-                Mars (Male American English)
-              </option>
-              <option value="aura-2-draco-en">
-                Draco (Male British English)
-              </option>
-              <option value="aura-2-hyperion-en">
-                Hyperion (Male Australian English)
-              </option>
-              <option value="aura-2-sirio-es">
-                Sirio (Male Mexican Spanish)
-              </option>
-            </select>
+          <!-- Text Input -->
+          <div class="config-section">
+            <label class="dg-form-label" for="text-input">
+              <i class="fa-solid fa-file-text"></i> Text to Speak
+            </label>
+            <textarea id="text-input" class="dg-input" rows="8"
+              placeholder="Enter text to synthesize...">Hello! This is a test of streaming text-to-speech. The audio should play smoothly as it's generated.</textarea>
+          </div>
 
-            <div class="dg-action-group" style="margin-top: auto">
-              <button id="generateBtn" class="dg-btn dg-btn--primary">
-                <i class="fa-solid fa-play"></i>
-                Generate Audio
-              </button>
-              <button id="cancelBtn" class="dg-btn dg-btn--secondary" hidden>
-                <i class="fa-solid fa-xmark"></i>
-                Cancel
+          <!-- Buttons -->
+          <button id="send-btn" class="dg-btn dg-btn--primary" style="width: 100%;" disabled>
+            <i class="fa-solid fa-paper-plane"></i> Send
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content: Playback & Transcript -->
+      <main class="dg-column dg-column--main">
+        <div class="main-content-container">
+          <!-- Connect Overlay -->
+          <div class="connect-overlay" id="connect-overlay">
+            <div class="connect-prompt">
+              <div class="connect-prompt__icon">
+                <i class="fa-solid fa-microphone-lines"></i>
+              </div>
+              <h2 class="connect-prompt__title">Live Text-to-Speech Ready</h2>
+              <p class="connect-prompt__subtitle">Configure settings and click Connect to start</p>
+
+              <!-- Connect Button -->
+              <button type="button" id="connect-btn" class="dg-btn dg-btn--primary dg-btn--lg">
+                <i class="fa-solid fa-plug"></i>
+                Connect
               </button>
             </div>
           </div>
-        </div>
 
-        <!-- Status indicator -->
-        <div
-          id="statusContainer"
-          class="dg-status dg-status--info"
-          style="margin-top: 1rem; display: none"
-        >
-          <i id="statusIcon" class="fa-solid fa-circle dg-status__icon"></i>
-          <span id="statusMessage">Ready</span>
-        </div>
-      </section>
-
-      <!-- ====================================================================
-         GENERATION QUEUE SECTION
-         ==================================================================== -->
-
-      <section class="dg-section dg-section--bordered">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-          "
-        >
-          <h2 class="dg-section-heading" style="margin-bottom: 0">
-            <i class="fa-solid fa-list"></i>
-            Generation Queue
-            <span
-              id="queueCount"
-              class="dg-badge dg-badge--secondary"
-              style="margin-left: 0.5rem"
-              >0</span
-            >
-          </h2>
-          <button
-            id="clearQueueBtn"
-            class="dg-btn dg-btn--ghost dg-btn--sm hidden"
-          >
-            <i class="fa-solid fa-trash"></i>
-            Clear All
-          </button>
-        </div>
-
-        <!-- Empty state (shown when queue is empty) -->
-        <div id="emptyState" class="empty-state">
-          <div class="empty-state-icon">
-            <i class="fa-solid fa-waveform-lines"></i>
+          <!-- Disconnect Button (hidden, shown when connected) -->
+          <div class="disconnect-container hidden" id="disconnect-container">
+            <button type="button" id="disconnect-btn" class="dg-btn dg-btn--secondary dg-btn--sm">
+              <i class="fa-solid fa-plug-circle-xmark"></i>
+              Disconnect
+            </button>
           </div>
-          <div class="empty-state-text">
-            <p
-              style="
-                margin: 0 0 0.5rem 0;
-                font-size: 1rem;
-                color: var(--dg-text, #fbfbff);
-              "
-            >
-              No audio generated yet
-            </p>
-            <p style="margin: 0">
-              Enter some text above and click "Generate Audio" to begin
-            </p>
+
+          <!-- Empty State -->
+          <div id="empty-state" class="empty-state">
+            <div class="empty-state__icon">
+              <i class="fa-solid fa-microphone-lines"></i>
+            </div>
+            <div class="empty-state__text">
+              Send text to start generating speech
+            </div>
+          </div>
+
+          <!-- Playback Section (hidden initially) -->
+          <div id="playback-section" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="playback-controls">
+              <div class="playback-info">
+                <div class="playback-info__label">Current State</div>
+                <div id="playback-state-text" class="playback-info__value">Idle</div>
+              </div>
+            </div>
+
+            <div class="transcript-container" id="transcript-container">
+              <!-- Transcript items will be added here -->
+            </div>
           </div>
         </div>
+      </main>
 
-        <!-- Queue list (populated dynamically by main.js) -->
-        <div id="queueList" class="queue-list hidden">
-          <!-- Queue items will be inserted here by JavaScript -->
+    </div><!-- end dg-columns__wrapper -->
+
+    <!-- Right Sidebar: Status & Metadata -->
+    <aside class="dg-column dg-column--sidebar-right">
+      <div class="dg-content-box">
+        <h3 class="dg-form-label" style="margin-bottom: 1rem;">Status</h3>
+
+        <div class="status-grid">
+          <!-- Connection Status -->
+          <div class="status-item">
+            <div class="status-item__label">Connection</div>
+            <div class="status-item__value">
+              <span class="status-badge status-badge--disconnected" id="connection-status">
+                <span class="status-indicator status-indicator--disconnected"></span>
+                Disconnected
+              </span>
+            </div>
+          </div>
+
+          <!-- Playback State -->
+          <div class="status-item">
+            <div class="status-item__label">Playback State</div>
+            <div class="status-item__value" id="playback-status">Idle</div>
+          </div>
+
+          <!-- Current Model -->
+          <div class="status-item">
+            <div class="status-item__label">Current Model</div>
+            <div class="status-item__value" id="current-model">—</div>
+          </div>
+
+          <!-- Audio Chunks -->
+          <div class="status-item">
+            <div class="status-item__label">Audio Chunks</div>
+            <div class="status-item__value" id="chunks-received">0</div>
+          </div>
+
+          <!-- Bytes Received -->
+          <div class="status-item">
+            <div class="status-item__label">Bytes Received</div>
+            <div class="status-item__value" id="bytes-received">0</div>
+          </div>
+
+          <!-- Buffers Queued -->
+          <div class="status-item">
+            <div class="status-item__label">Buffers Queued</div>
+            <div class="status-item__value" id="buffers-queued">0</div>
+          </div>
+
+          <!-- Session Duration -->
+          <div class="status-item">
+            <div class="status-item__label">Session Duration</div>
+            <div class="status-item__value" id="session-duration">00:00</div>
+          </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </aside>
 
-    <!-- ======================================================================
-       FOOTER
-       ====================================================================== -->
+  </div><!-- end dg-columns -->
+</body>
 
-    <footer class="dg-footer">
-      <p>
-        Powered by
-        <a href="https://deepgram.com" class="dg-link" target="_blank"
-          >Deepgram</a
-        >
-      </p>
-    </footer>
-
-    <!-- ======================================================================
-       HIDDEN AUDIO ELEMENT (for playback)
-       ====================================================================== -->
-
-    <audio id="audioPlayer" style="display: none"></audio>
-  </body>
 </html>

@@ -16,6 +16,29 @@ function getBasePath() {
   return path;
 }
 
+// ============================================================================
+// SESSION MANAGEMENT
+// ============================================================================
+
+const SESSION_ENDPOINT = getBasePath() + 'api/session';
+let sessionToken = null;
+
+function getPageNonce() {
+  const meta = document.querySelector('meta[name="session-nonce"]');
+  return meta ? meta.content : null;
+}
+
+async function getSessionToken() {
+  if (sessionToken) return sessionToken;
+  const nonce = getPageNonce();
+  const headers = nonce ? { 'X-Session-Nonce': nonce } : {};
+  const response = await fetch(SESSION_ENDPOINT, { headers });
+  if (!response.ok) throw new Error(`Session failed: ${response.status}`);
+  const data = await response.json();
+  sessionToken = data.token;
+  return sessionToken;
+}
+
 const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_BASE_URL = `${WS_PROTOCOL}//${window.location.host}${getBasePath()}`;
 const SAMPLE_RATE = 48000;
@@ -145,12 +168,17 @@ async function loadMetadata() {
 /**
  * Handle Connect button click
  */
-function handleConnect() {
+async function handleConnect() {
   const model = modelSelect.value;
   const wsUrl = `${WS_BASE_URL}api/live-text-to-speech?model=${model}&encoding=linear16&sample_rate=${SAMPLE_RATE}&container=none`;
 
   console.log('Connecting to:', wsUrl);
-  ws = new WebSocket(wsUrl);
+
+  // Get session token for WebSocket auth
+  const token = await getSessionToken();
+
+  // Create WebSocket with JWT auth via subprotocol
+  ws = new WebSocket(wsUrl, [`access_token.${token}`]);
 
   ws.addEventListener('open', () => {
     console.log('✓ WebSocket connected');
@@ -201,6 +229,17 @@ function handleConnect() {
 
   ws.addEventListener('close', (event) => {
     console.log(`WebSocket closed: ${event.code} ${event.reason || '(no reason)'}`);
+
+    // Handle session expiry
+    if (event.code === 4401) {
+      sessionToken = null;
+      updateConnectionStatus('error', 'Session Expired');
+      handleStopAudio();
+      sendBtn.disabled = true;
+      alert('Session expired, please refresh the page.');
+      return;
+    }
+
     updateConnectionStatus('disconnected', 'Disconnected');
 
     // Show connect overlay, hide disconnect button

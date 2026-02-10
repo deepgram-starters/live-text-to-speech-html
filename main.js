@@ -4,23 +4,11 @@
  * Streaming WebSocket-based TTS with dynamic audio buffering
  */
 
-// Configuration
-
-/**
- * Computes the base path from the current page URL.
- * Ensures a trailing slash so relative paths resolve correctly under subpath deployments.
- */
-function getBasePath() {
-  let path = window.location.pathname;
-  if (!path.endsWith('/')) path += '/';
-  return path;
-}
-
 // ============================================================================
 // SESSION MANAGEMENT
 // ============================================================================
 
-const SESSION_ENDPOINT = getBasePath() + 'api/session';
+const SESSION_ENDPOINT = 'api/session';
 let sessionToken = null;
 
 function getPageNonce() {
@@ -39,8 +27,6 @@ async function getSessionToken() {
   return sessionToken;
 }
 
-const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_BASE_URL = `${WS_PROTOCOL}//${window.location.host}${getBasePath()}`;
 const SAMPLE_RATE = 48000;
 const BUFFER_AHEAD_TIME = 0.1; // Start playing when we have 100ms buffered
 
@@ -131,7 +117,7 @@ function initAudioContext() {
  */
 async function loadMetadata() {
   try {
-    const response = await fetch(getBasePath() + 'api/metadata');
+    const response = await fetch('api/metadata');
     if (!response.ok) {
       console.warn('Failed to load metadata, using defaults');
       return;
@@ -170,15 +156,16 @@ async function loadMetadata() {
  */
 async function handleConnect() {
   const model = modelSelect.value;
-  const wsUrl = `${WS_BASE_URL}api/live-text-to-speech?model=${model}&encoding=linear16&sample_rate=${SAMPLE_RATE}&container=none`;
+  const wsUrl = new URL(`api/live-text-to-speech?model=${model}&encoding=linear16&sample_rate=${SAMPLE_RATE}&container=none`, document.baseURI);
+  wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
 
-  console.log('Connecting to:', wsUrl);
+  console.log('Connecting to:', wsUrl.href);
 
   // Get session token for WebSocket auth
   const token = await getSessionToken();
 
   // Create WebSocket with JWT auth via subprotocol
-  ws = new WebSocket(wsUrl, [`access_token.${token}`]);
+  ws = new WebSocket(wsUrl.href, [`access_token.${token}`]);
 
   ws.addEventListener('open', () => {
     console.log('✓ WebSocket connected');

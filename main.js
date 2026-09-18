@@ -32,6 +32,7 @@ let audioQueue = [];
 let scheduledSources = [];
 let sessionStartTime = null;
 let durationInterval = null;
+let lastConnectionError = null;
 
 // Stats
 let chunksReceived = 0;
@@ -148,6 +149,7 @@ async function loadMetadata() {
  * Handle Connect button click
  */
 async function handleConnect() {
+  lastConnectionError = null;
   const model = modelSelect.value;
   const wsUrl = new URL(`api/live-text-to-speech?model=${model}&encoding=linear16&sample_rate=${SAMPLE_RATE}&container=none`, document.baseURI);
   wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -186,7 +188,8 @@ async function handleConnect() {
       console.log('← JSON:', msg);
 
       if (msg.type === 'Error') {
-        updateConnectionStatus('error', 'Error');
+        lastConnectionError = msg.description || msg.code || 'Connection failed';
+        updateConnectionStatus('error', lastConnectionError);
         console.error('Error from server:', msg);
       } else if (msg.type === 'Flushed') {
         console.log('Stream flushed, all audio sent');
@@ -220,7 +223,11 @@ async function handleConnect() {
       return;
     }
 
-    updateConnectionStatus('disconnected', 'Disconnected');
+    if (lastConnectionError) {
+      updateConnectionStatus('error', lastConnectionError);
+    } else {
+      updateConnectionStatus('disconnected', 'Disconnected');
+    }
 
     // Show connect overlay, hide disconnect button
     connectOverlay.classList.remove('hidden');

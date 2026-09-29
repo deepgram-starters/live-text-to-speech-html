@@ -26,7 +26,7 @@
     "url": "https://github.com/deepgram-starters/live-text-to-speech-html.git"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "browserslist": [
     "defaults",
@@ -34,7 +34,7 @@
     "not op_mini all"
   ],
   "dependencies": {
-    "@deepgram/styles": "latest"
+    "@deepgram/styles": "^0.2.15"
   },
   "devDependencies": {
     "vite": "^7.3.5"
